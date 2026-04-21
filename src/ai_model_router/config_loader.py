@@ -6,14 +6,19 @@ from typing import Any
 import yaml
 
 from .models import (
+    BudgetMode,
     Boosts,
     Escalation,
     ModelTier,
     Penalties,
+    Priority,
     RequiredConstraints,
     ScoringWeights,
     TaskProfile,
 )
+
+PRIORITIES: tuple[Priority, ...] = ("balanced", "latency", "quality", "reliability")
+BUDGET_MODES: tuple[BudgetMode, ...] = ("balanced", "economy", "premium")
 
 
 def _read_yaml(path: str | Path) -> dict[str, Any]:
@@ -23,6 +28,42 @@ def _read_yaml(path: str | Path) -> dict[str, Any]:
         msg = f"YAML root must be a mapping: {path}"
         raise ValueError(msg)
     return data
+
+
+def _load_weights(raw: Any, *, context: str) -> ScoringWeights:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{context} must be a mapping")
+
+    return ScoringWeights(
+        coding=float(raw.get("coding", 0.0)),
+        reasoning=float(raw.get("reasoning", 0.0)),
+        latency=float(raw.get("latency", 0.0)),
+        cost=float(raw.get("cost", 0.0)),
+        reliability=float(raw.get("reliability", 0.0)),
+    )
+
+
+def _load_weight_adjustments(
+    raw: Any,
+    *,
+    allowed_keys: tuple[str, ...],
+    context: str,
+) -> dict[str, ScoringWeights]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{context} must be a mapping")
+
+    adjustments: dict[str, ScoringWeights] = {}
+    for key, weights in raw.items():
+        key_str = str(key)
+        if key_str not in allowed_keys:
+            raise ValueError(f"Unknown {context} key: {key_str}")
+        adjustments[key_str] = _load_weights(weights, context=f"{context}.{key_str}")
+
+    return adjustments
 
 
 def load_model_tiers(path: str | Path) -> tuple[ModelTier, ...]:
@@ -37,15 +78,16 @@ def load_model_tiers(path: str | Path) -> tuple[ModelTier, ...]:
         if not isinstance(item, dict):
             raise ValueError("Each model entry must be a mapping")
 
-        name = str(item["name"])
-        if name in seen_names:
-            raise ValueError(f"Duplicate model name: {name}")
-        seen_names.add(name)
+        routing_tier = str(item.get("routing_tier", item.get("name")))
+        if routing_tier in seen_names:
+            raise ValueError(f"Duplicate routing tier: {routing_tier}")
+        seen_names.add(routing_tier)
 
         models.append(
             ModelTier(
-                name=name,
+                routing_tier=routing_tier,
                 provider=str(item["provider"]),
+                model_name=str(item.get("model_name", item.get("deployment_name"))),
                 deployment_name=str(item["deployment_name"]),
                 role_tags=tuple(item.get("role_tags", [])),
                 supports_tools=bool(item.get("supports_tools", False)),
@@ -80,6 +122,8 @@ def load_task_profiles(path: str | Path) -> dict[str, TaskProfile]:
 
         required = item.get("required_constraints", {}) or {}
         scoring = item.get("scoring_weights", {}) or {}
+        priority_adjustments = item.get("priority_weight_adjustments", {}) or {}
+        budget_adjustments = item.get("budget_weight_adjustments", {}) or {}
         boosts = item.get("boosts", {}) or {}
         penalties = item.get("penalties", {}) or {}
         escalation = item.get("escalation", {}) or {}
@@ -94,12 +138,19 @@ def load_task_profiles(path: str | Path) -> dict[str, TaskProfile]:
                 long_context=required.get("long_context"),
                 required_role_tags=tuple(required.get("required_role_tags", [])),
             ),
-            scoring_weights=ScoringWeights(
-                coding=float(scoring.get("coding", 0.0)),
-                reasoning=float(scoring.get("reasoning", 0.0)),
-                latency=float(scoring.get("latency", 0.0)),
-                cost=float(scoring.get("cost", 0.0)),
-                reliability=float(scoring.get("reliability", 0.0)),
+            scoring_weights=_load_weights(
+                scoring,
+                context=f"task_profiles.{capability}.scoring_weights",
+            ),
+            priority_weight_adjustments=_load_weight_adjustments(
+                priority_adjustments,
+                allowed_keys=PRIORITIES,
+                context=f"task_profiles.{capability}.priority_weight_adjustments",
+            ),
+            budget_weight_adjustments=_load_weight_adjustments(
+                budget_adjustments,
+                allowed_keys=BUDGET_MODES,
+                context=f"task_profiles.{capability}.budget_weight_adjustments",
             ),
             boosts=Boosts(
                 preferred_tier=float(boosts.get("preferred_tier", 1.0)),

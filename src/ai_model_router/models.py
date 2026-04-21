@@ -20,8 +20,9 @@ class RequestContext:
 
 @dataclass(frozen=True, slots=True)
 class ModelTier:
-    name: str
+    routing_tier: str
     provider: str
+    model_name: str
     deployment_name: str
     role_tags: tuple[str, ...]
     supports_tools: bool
@@ -78,6 +79,8 @@ class TaskProfile:
     preferred_tags: tuple[str, ...] = ()
     required_constraints: RequiredConstraints = field(default_factory=RequiredConstraints)
     scoring_weights: ScoringWeights = field(default_factory=ScoringWeights)
+    priority_weight_adjustments: dict[Priority, ScoringWeights] = field(default_factory=dict)
+    budget_weight_adjustments: dict[BudgetMode, ScoringWeights] = field(default_factory=dict)
     boosts: Boosts = field(default_factory=Boosts)
     penalties: Penalties = field(default_factory=Penalties)
     escalation: Escalation = field(default_factory=Escalation)
@@ -85,17 +88,59 @@ class TaskProfile:
 
 
 @dataclass(frozen=True, slots=True)
-class RankedCandidate:
-    model_name: str
+class ModelSelection:
+    routing_tier: str
     provider: str
+    model_name: str
+    deployment_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScoreComponent:
+    name: str
+    value: float
+    details: str
+
+
+@dataclass(frozen=True, slots=True)
+class FilteredCandidate:
+    routing_tier: str
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RankedCandidate:
+    routing_tier: str
+    provider: str
+    model_name: str
     deployment_name: str
     score: float
+    score_components: tuple[ScoreComponent, ...]
     reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class RoutingDecision:
-    primary_model: str
-    fallback_models: tuple[str, ...]
+    capability: str
+    profile: str
+    primary: ModelSelection
+    fallbacks: tuple[ModelSelection, ...]
     ranked_candidates: tuple[RankedCandidate, ...]
+    filtered_candidates: tuple[FilteredCandidate, ...]
     debug_reasons: tuple[str, ...]
+
+    @property
+    def primary_model(self) -> str:
+        return self.primary.model_name
+
+    @property
+    def primary_routing_tier(self) -> str:
+        return self.primary.routing_tier
+
+    @property
+    def fallback_models(self) -> tuple[str, ...]:
+        return tuple(fallback.model_name for fallback in self.fallbacks)
+
+    @property
+    def fallback_routing_tiers(self) -> tuple[str, ...]:
+        return tuple(fallback.routing_tier for fallback in self.fallbacks)

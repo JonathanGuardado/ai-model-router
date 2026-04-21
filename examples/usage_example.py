@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from ai_model_router.models import RequestContext
 from ai_model_router.router import DeterministicRouter
 
 
@@ -10,18 +9,16 @@ router = DeterministicRouter.from_yaml(
     root / "config" / "task_profiles.yaml",
 )
 
-ctx = RequestContext(
-    capability="code.implement",
-    retry_count=0,
-    needs_tools=True,
-    needs_json=True,
-    long_context=False,
-    priority="quality",
-    budget_mode="balanced",
+decision = router.route_prompt("hello")
+print("primary tier:", decision.primary.routing_tier)
+print("primary endpoint:", decision.primary)
+print("fallback tiers:", list(decision.fallback_routing_tiers))
+print(
+    "ranked:",
+    [(c.routing_tier, c.model_name, c.score) for c in decision.ranked_candidates],
 )
-
-decision = router.route(ctx)
-print("primary:", decision.primary_model)
-print("fallbacks:", list(decision.fallback_models))
-print("ranked:", [(c.model_name, c.score) for c in decision.ranked_candidates])
+print(
+    "score breakdown:",
+    [(c.name, c.value, c.details) for c in decision.ranked_candidates[0].score_components],
+)
 print("debug:", list(decision.debug_reasons))

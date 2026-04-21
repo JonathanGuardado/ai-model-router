@@ -1,6 +1,7 @@
 models:
-  - name: local_fast
+  - routing_tier: local_fast
     provider: local
+    model_name: local_model
     deployment_name: local-fast-v1
     role_tags: [local, fast, trivial]
     supports_tools: false
@@ -13,8 +14,9 @@ models:
     reliability_score: 6.0
     enabled: true
 
-  - name: web_agent
+  - routing_tier: web_agent
     provider: hosted
+    model_name: hosted-web-agent
     deployment_name: web-agent-v2
     role_tags: [web, agent, research]
     supports_tools: true
@@ -27,8 +29,9 @@ models:
     reliability_score: 7.0
     enabled: true
 
-  - name: coding_primary
+  - routing_tier: coding_primary
     provider: hosted
+    model_name: hosted-coding-model
     deployment_name: coding-primary-v3
     role_tags: [coding, implementation]
     supports_tools: true
@@ -41,8 +44,9 @@ models:
     reliability_score: 8.0
     enabled: true
 
-  - name: reasoning_primary
+  - routing_tier: reasoning_primary
     provider: hosted
+    model_name: hosted-reasoning-model
     deployment_name: reasoning-premium-v1
     role_tags: [premium, reasoning, architecture]
     supports_tools: true

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 
 from .config_loader import load_model_tiers, load_task_profiles
 from .models import (
+    FilteredCandidate,
+    ModelSelection,
     ModelTier,
     RankedCandidate,
     RequestContext,
     RoutingDecision,
+    ScoreComponent,
     ScoringWeights,
     TaskProfile,
 )
@@ -36,46 +38,150 @@ class DeterministicRouter:
     def route(self, context: RequestContext) -> RoutingDecision:
         profile = self._resolve_profile(context.capability)
         debug: list[str] = [f"profile={profile.capability}"]
+        filtered_candidates: list[FilteredCandidate] = []
 
-        ranked_pool: list[tuple[ModelTier, float, tuple[str, ...]]] = []
+        ranked_pool: list[
+            tuple[ModelTier, float, tuple[ScoreComponent, ...], tuple[str, ...]]
+        ] = []
 
         for model in self._models:
             compatible, filter_reasons = self._is_compatible(model, context, profile)
             if not compatible:
-                debug.append(f"filtered:{model.name}:{'|'.join(filter_reasons)}")
+                debug.append(
+                    f"filtered:{model.routing_tier}:{'|'.join(filter_reasons)}"
+                )
+                filtered_candidates.append(
+                    FilteredCandidate(
+                        routing_tier=model.routing_tier,
+                        reasons=filter_reasons,
+                    )
+                )
                 continue
 
-            score, reasons = self._score(model, context, profile)
-            ranked_pool.append((model, score, reasons))
+            score, components, reasons = self._score(model, context, profile)
+            ranked_pool.append((model, score, components, reasons))
 
         if not ranked_pool:
             raise RoutingError(
                 f"No compatible model candidates for capability '{context.capability}'"
             )
 
-        ranked_pool.sort(key=lambda item: (-item[1], item[0].name))
+        ranked_pool.sort(key=lambda item: (-item[1], item[0].routing_tier))
 
         ranked_candidates = tuple(
             RankedCandidate(
-                model_name=model.name,
+                routing_tier=model.routing_tier,
                 provider=model.provider,
+                model_name=model.model_name,
                 deployment_name=model.deployment_name,
                 score=round(score, 6),
+                score_components=components,
                 reasons=reasons,
             )
-            for model, score, reasons in ranked_pool
+            for model, score, components, reasons in ranked_pool
         )
 
         fallback_count = max(0, min(profile.fallback_count, len(ranked_candidates) - 1))
-        fallback_models = tuple(
-            candidate.model_name for candidate in ranked_candidates[1 : 1 + fallback_count]
+        primary = self._selection_from_candidate(ranked_candidates[0])
+        fallbacks = tuple(
+            self._selection_from_candidate(candidate)
+            for candidate in ranked_candidates[1 : 1 + fallback_count]
         )
 
         return RoutingDecision(
-            primary_model=ranked_candidates[0].model_name,
-            fallback_models=fallback_models,
+            capability=context.capability,
+            profile=profile.capability,
+            primary=primary,
+            fallbacks=fallbacks,
             ranked_candidates=ranked_candidates,
+            filtered_candidates=tuple(filtered_candidates),
             debug_reasons=tuple(debug),
+        )
+
+    def route_prompt(self, prompt: str) -> RoutingDecision:
+        return self.route(self.infer_context(prompt))
+
+    def infer_context(self, prompt: str) -> RequestContext:
+        normalized = prompt.lower()
+        word_count = len(normalized.split())
+        long_context = word_count > 500
+
+        if self._contains_any(
+            normalized,
+            (
+                "browse",
+                "current",
+                "latest",
+                "news",
+                "research",
+                "search",
+                "today",
+                "web",
+            ),
+        ):
+            return RequestContext(
+                capability="web.research",
+                needs_tools=True,
+                long_context=True,
+                priority="quality" if word_count > 40 else "balanced",
+            )
+
+        if self._contains_any(
+            normalized,
+            (
+                "architecture",
+                "design a system",
+                "distributed system",
+                "scalable",
+                "tradeoff",
+                "trade-off",
+            ),
+        ):
+            return RequestContext(
+                capability="architecture.design",
+                long_context=long_context,
+                priority="quality",
+                budget_mode="premium",
+            )
+
+        if self._contains_any(
+            normalized,
+            (
+                "bug",
+                "code",
+                "debug",
+                "fix",
+                "function",
+                "implement",
+                "python",
+                "refactor",
+                "test",
+            ),
+        ):
+            return RequestContext(
+                capability="code.implement",
+                needs_tools=True,
+                needs_json=True,
+                long_context=long_context,
+                priority="quality",
+            )
+
+        return RequestContext(
+            capability="trivial.classify",
+            needs_json=True,
+            priority="latency",
+            budget_mode="economy",
+        )
+
+    def _contains_any(self, text: str, needles: tuple[str, ...]) -> bool:
+        return any(needle in text for needle in needles)
+
+    def _selection_from_candidate(self, candidate: RankedCandidate) -> ModelSelection:
+        return ModelSelection(
+            routing_tier=candidate.routing_tier,
+            provider=candidate.provider,
+            model_name=candidate.model_name,
+            deployment_name=candidate.deployment_name,
         )
 
     def _resolve_profile(self, capability: str) -> TaskProfile:
@@ -121,89 +227,109 @@ class DeterministicRouter:
 
     def _adjust_weights(
         self,
-        base: ScoringWeights,
+        profile: TaskProfile,
         context: RequestContext,
-    ) -> tuple[ScoringWeights, list[str]]:
-        adjusted = replace(base)
+    ) -> tuple[ScoringWeights, list[ScoreComponent], list[str]]:
+        adjusted = profile.scoring_weights
+        components: list[ScoreComponent] = []
         reasons: list[str] = []
 
-        if context.priority == "latency":
-            adjusted = replace(adjusted, latency=adjusted.latency + 1.5)
-            reasons.append("priority_latency:+latency")
-        elif context.priority == "quality":
-            adjusted = replace(
-                adjusted,
-                coding=adjusted.coding + 0.8,
-                reasoning=adjusted.reasoning + 1.0,
-                reliability=adjusted.reliability + 0.6,
+        priority_adjustment = profile.priority_weight_adjustments.get(context.priority)
+        if priority_adjustment is not None:
+            adjusted = self._add_weights(adjusted, priority_adjustment)
+            components.append(
+                ScoreComponent(
+                    name=f"priority:{context.priority}",
+                    value=0.0,
+                    details=self._format_adjustment(priority_adjustment),
+                )
             )
-            reasons.append("priority_quality:+coding,+reasoning,+reliability")
-        elif context.priority == "reliability":
-            adjusted = replace(adjusted, reliability=adjusted.reliability + 1.5)
-            reasons.append("priority_reliability:+reliability")
+            reasons.append(
+                f"priority_{context.priority}:{self._format_adjustment(priority_adjustment)}"
+            )
 
-        if context.budget_mode == "economy":
-            adjusted = replace(
-                adjusted,
-                cost=adjusted.cost + 1.8,
-                latency=adjusted.latency + 0.4,
-                reasoning=max(0.0, adjusted.reasoning - 0.3),
+        budget_adjustment = profile.budget_weight_adjustments.get(context.budget_mode)
+        if budget_adjustment is not None:
+            adjusted = self._add_weights(adjusted, budget_adjustment)
+            components.append(
+                ScoreComponent(
+                    name=f"budget:{context.budget_mode}",
+                    value=0.0,
+                    details=self._format_adjustment(budget_adjustment),
+                )
             )
-            reasons.append("budget_economy:+cost,+latency,-reasoning")
-        elif context.budget_mode == "premium":
-            adjusted = replace(
-                adjusted,
-                reasoning=adjusted.reasoning + 1.1,
-                reliability=adjusted.reliability + 0.8,
-                cost=max(0.0, adjusted.cost - 0.5),
+            reasons.append(
+                f"budget_{context.budget_mode}:{self._format_adjustment(budget_adjustment)}"
             )
-            reasons.append("budget_premium:+reasoning,+reliability,-cost")
 
-        return adjusted, reasons
+        adjusted = ScoringWeights(
+            coding=max(0.0, adjusted.coding),
+            reasoning=max(0.0, adjusted.reasoning),
+            latency=max(0.0, adjusted.latency),
+            cost=max(0.0, adjusted.cost),
+            reliability=max(0.0, adjusted.reliability),
+        )
+
+        return adjusted, components, reasons
 
     def _score(
         self,
         model: ModelTier,
         context: RequestContext,
         profile: TaskProfile,
-    ) -> tuple[float, tuple[str, ...]]:
+    ) -> tuple[float, tuple[ScoreComponent, ...], tuple[str, ...]]:
+        components: list[ScoreComponent] = []
         reasons: list[str] = []
-        weights, adjusted_reasons = self._adjust_weights(profile.scoring_weights, context)
+        weights, adjustment_components, adjusted_reasons = self._adjust_weights(
+            profile,
+            context,
+        )
+        components.extend(adjustment_components)
         reasons.extend(adjusted_reasons)
 
         score = 0.0
 
-        score += weights.coding * model.coding_score
-        reasons.append(
-            f"coding:{weights.coding:.2f}*{model.coding_score:.2f}={weights.coding * model.coding_score:.2f}"
+        score += self._weighted_component(
+            components, reasons, "coding", weights.coding, model.coding_score
+        )
+        score += self._weighted_component(
+            components, reasons, "reasoning", weights.reasoning, model.reasoning_score
+        )
+        score += self._weighted_component(
+            components, reasons, "latency", weights.latency, model.latency_score
+        )
+        score += self._weighted_component(
+            components, reasons, "cost", weights.cost, model.cost_score
+        )
+        score += self._weighted_component(
+            components,
+            reasons,
+            "reliability",
+            weights.reliability,
+            model.reliability_score,
         )
 
-        score += weights.reasoning * model.reasoning_score
-        reasons.append(
-            f"reasoning:{weights.reasoning:.2f}*{model.reasoning_score:.2f}={weights.reasoning * model.reasoning_score:.2f}"
-        )
-
-        score += weights.latency * model.latency_score
-        reasons.append(
-            f"latency:{weights.latency:.2f}*{model.latency_score:.2f}={weights.latency * model.latency_score:.2f}"
-        )
-
-        score += weights.cost * model.cost_score
-        reasons.append(
-            f"cost:{weights.cost:.2f}*{model.cost_score:.2f}={weights.cost * model.cost_score:.2f}"
-        )
-
-        score += weights.reliability * model.reliability_score
-        reasons.append(
-            f"reliability:{weights.reliability:.2f}*{model.reliability_score:.2f}={weights.reliability * model.reliability_score:.2f}"
-        )
-
-        if model.name in profile.preferred_tiers:
+        if model.routing_tier in profile.preferred_tiers:
             score += profile.boosts.preferred_tier
+            components.append(
+                ScoreComponent(
+                    name="preferred_tier",
+                    value=profile.boosts.preferred_tier,
+                    details=model.routing_tier,
+                )
+            )
             reasons.append(f"preferred_tier:+{profile.boosts.preferred_tier:.2f}")
 
         if any(tag in profile.preferred_tags for tag in model.role_tags):
             score += profile.boosts.preferred_tag
+            matched_tags = sorted(set(profile.preferred_tags).intersection(model.role_tags))
+            components.append(
+                ScoreComponent(
+                    name="preferred_tag",
+                    value=profile.boosts.preferred_tag,
+                    details=",".join(matched_tags),
+                )
+            )
             reasons.append(f"preferred_tag:+{profile.boosts.preferred_tag:.2f}")
 
         if (
@@ -216,6 +342,13 @@ class DeterministicRouter:
         ):
             retry_boost = profile.boosts.retry_premium * float(context.retry_count)
             score += retry_boost
+            components.append(
+                ScoreComponent(
+                    name="retry_escalation",
+                    value=retry_boost,
+                    details=f"retry_count={context.retry_count}",
+                )
+            )
             reasons.append(f"retry_escalation:+{retry_boost:.2f}")
 
         if (
@@ -223,6 +356,61 @@ class DeterministicRouter:
             and model.reliability_score < profile.penalties.low_reliability_threshold
         ):
             score -= profile.penalties.low_reliability
+            components.append(
+                ScoreComponent(
+                    name="reliability_penalty",
+                    value=-profile.penalties.low_reliability,
+                    details=(
+                        f"{model.reliability_score:.2f}<"
+                        f"{profile.penalties.low_reliability_threshold:.2f}"
+                    ),
+                )
+            )
             reasons.append(f"reliability_penalty:-{profile.penalties.low_reliability:.2f}")
 
-        return score, tuple(reasons)
+        return score, tuple(components), tuple(reasons)
+
+    def _weighted_component(
+        self,
+        components: list[ScoreComponent],
+        reasons: list[str],
+        name: str,
+        weight: float,
+        model_score: float,
+    ) -> float:
+        value = weight * model_score
+        components.append(
+            ScoreComponent(
+                name=name,
+                value=value,
+                details=f"{weight:.2f}*{model_score:.2f}",
+            )
+        )
+        reasons.append(f"{name}:{weight:.2f}*{model_score:.2f}={value:.2f}")
+        return value
+
+    def _add_weights(
+        self,
+        left: ScoringWeights,
+        right: ScoringWeights,
+    ) -> ScoringWeights:
+        return ScoringWeights(
+            coding=left.coding + right.coding,
+            reasoning=left.reasoning + right.reasoning,
+            latency=left.latency + right.latency,
+            cost=left.cost + right.cost,
+            reliability=left.reliability + right.reliability,
+        )
+
+    def _format_adjustment(self, weights: ScoringWeights) -> str:
+        parts = []
+        for name, value in (
+            ("coding", weights.coding),
+            ("reasoning", weights.reasoning),
+            ("latency", weights.latency),
+            ("cost", weights.cost),
+            ("reliability", weights.reliability),
+        ):
+            if value != 0:
+                parts.append(f"{name}:{value:+.2f}")
+        return ",".join(parts) if parts else "no-op"

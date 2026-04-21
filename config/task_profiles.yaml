@@ -1,3 +1,23 @@
+weight_policy:
+  priority_weight_adjustments: &standard_priority_weight_adjustments
+    latency:
+      latency: 1.5
+    quality:
+      coding: 0.8
+      reasoning: 1.0
+      reliability: 0.6
+    reliability:
+      reliability: 1.5
+  budget_weight_adjustments: &standard_budget_weight_adjustments
+    economy:
+      cost: 1.8
+      latency: 0.4
+      reasoning: -0.3
+    premium:
+      reasoning: 1.1
+      reliability: 0.8
+      cost: -0.5
+
 task_profiles:
   - capability: default
     preferred_tiers: []
@@ -9,6 +29,8 @@ task_profiles:
       latency: 0.7
       cost: 0.7
       reliability: 1.0
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 1.0
       preferred_tag: 0.6
@@ -32,6 +54,8 @@ task_profiles:
       latency: 1.3
       cost: 1.5
       reliability: 0.6
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 2.0
       preferred_tag: 1.0
@@ -57,6 +81,8 @@ task_profiles:
       latency: 0.5
       cost: 0.4
       reliability: 1.0
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 2.0
       preferred_tag: 1.0
@@ -81,6 +107,8 @@ task_profiles:
       latency: 0.5
       cost: 0.4
       reliability: 1.0
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 2.5
       preferred_tag: 1.0
@@ -104,6 +132,8 @@ task_profiles:
       latency: 0.2
       cost: 0.2
       reliability: 1.2
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 3.0
       preferred_tag: 1.5
@@ -127,6 +157,8 @@ task_profiles:
       latency: 0.4
       cost: 0.5
       reliability: 1.5
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 1.5
       preferred_tag: 0.8
@@ -150,6 +182,8 @@ task_profiles:
       latency: 0.3
       cost: 0.5
       reliability: 1.4
+    priority_weight_adjustments: *standard_priority_weight_adjustments
+    budget_weight_adjustments: *standard_budget_weight_adjustments
     boosts:
       preferred_tier: 1.3
       preferred_tag: 0.8
