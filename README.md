@@ -10,6 +10,25 @@ A lightweight, deterministic intent and model routing package.
 - Separate routing tiers from provider model/deployment endpoints
 - Deterministic ranked output with fallback chain and structured score/debug reasons
 
+## Recommended Flow
+
+Use the two layers explicitly:
+
+```text
+IntentResolver.resolve(text)
+  -> CapabilityResolution
+build_request_context(resolution)
+  -> RequestContext
+DeterministicRouter.route(context)
+  -> RoutingDecision
+```
+
+In other words:
+
+- `IntentResolver` turns free-form text into a `CapabilityResolution`.
+- `build_request_context(...)` converts that resolution into a router-ready `RequestContext`.
+- Model routing, implemented by `DeterministicRouter`, turns a `RequestContext` into a `RoutingDecision`.
+
 ## Two Layers
 
 `IntentResolver` answers: "What kind of task is this text asking for?"
@@ -18,24 +37,20 @@ Input: free-form text
 
 Output: `CapabilityResolution`
 
-`DeterministicRouter` answers: "Which configured model tier should handle this task?"
+`DeterministicRouter` is the model router. It answers: "Which configured model
+tier should handle this task?"
 
 Input: `RequestContext`
 
 Output: `RoutingDecision`
 
-The intended flow is:
-
-```text
-free-form text
-  -> IntentResolver.resolve(...)
-  -> CapabilityResolution
-  -> build_request_context(...)
-  -> DeterministicRouter.route(...)
-  -> RoutingDecision
-```
-
 No remote calls or LLM classification calls are used in the normal path.
+
+## What This Repo Does Not Do
+
+This package does not execute models, call providers, orchestrate workflows,
+manage agents, or integrate with external tools. It stops after producing a
+structured routing decision.
 
 ## Quick start
 
@@ -44,7 +59,11 @@ No remote calls or LLM classification calls are used in the normal path.
 3. Edit [config/task_profiles.yaml](config/task_profiles.yaml)
 4. Resolve intent, build a `RequestContext`, and route it
 
-See [examples/usage_example.py](examples/usage_example.py).
+See [examples/usage_example.py](examples/usage_example.py) for free-form text
+to intent resolution to model routing.
+
+See [examples/direct_route_example.py](examples/direct_route_example.py) for
+direct `RequestContext` to model routing.
 
 ```python
 from ai_model_router.config_loader import load_capability_definitions
@@ -65,8 +84,11 @@ print(resolution.capability)
 print(decision.primary)
 ```
 
-For compatibility, `DeterministicRouter.route_prompt(...)` is available when the
-router is constructed with a configured intent resolver via `capabilities_path`.
+`DeterministicRouter.route_prompt(...)` exists as a convenience helper when the
+router is constructed with `capabilities_path`, but it is not the recommended
+main flow. Prefer using `IntentResolver.resolve(...)` and
+`build_request_context(...)` explicitly when you want clear separation between
+intent resolution and model routing.
 
 ## Config shape
 

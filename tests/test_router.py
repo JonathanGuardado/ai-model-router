@@ -14,6 +14,10 @@ CAPABILITIES = ROOT / "config" / "capabilities.yaml"
 
 
 def _router() -> DeterministicRouter:
+    return DeterministicRouter.from_yaml(MODELS, PROFILES)
+
+
+def _router_with_prompt_helper() -> DeterministicRouter:
     return DeterministicRouter.from_yaml(MODELS, PROFILES, CAPABILITIES)
 
 
@@ -32,8 +36,8 @@ def test_trivial_prefers_local_fast() -> None:
     assert len(decision.fallback_models) == 2
 
 
-def test_prompt_hello_routes_to_local_fast() -> None:
-    router = _router()
+def test_route_prompt_convenience_uses_intent_resolver_for_hello() -> None:
+    router = _router_with_prompt_helper()
 
     decision = router.route_prompt("hello")
 
@@ -42,8 +46,8 @@ def test_prompt_hello_routes_to_local_fast() -> None:
     assert decision.primary_model == "local_model"
 
 
-def test_prompt_code_request_routes_to_coding_primary() -> None:
-    router = _router()
+def test_route_prompt_convenience_uses_intent_resolver_for_code_request() -> None:
+    router = _router_with_prompt_helper()
 
     decision = router.route_prompt("Write a Python function and tests for sorting users")
 
