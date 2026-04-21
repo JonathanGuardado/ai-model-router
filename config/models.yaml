@@ -2,7 +2,7 @@ models:
   - routing_tier: local_fast
     provider: local
     model_name: local_model
-    deployment_name: local-fast-v1
+    deployment_name: local_model
     role_tags: [local, fast, trivial]
     supports_tools: false
     supports_json: true
@@ -16,8 +16,8 @@ models:
 
   - routing_tier: web_agent
     provider: hosted
-    model_name: hosted-web-agent
-    deployment_name: web-agent-v2
+    model_name: web_model
+    deployment_name: web_model
     role_tags: [web, agent, research]
     supports_tools: true
     supports_json: true
@@ -31,8 +31,8 @@ models:
 
   - routing_tier: coding_primary
     provider: hosted
-    model_name: hosted-coding-model
-    deployment_name: coding-primary-v3
+    model_name: coding_model
+    deployment_name: coding_model
     role_tags: [coding, implementation]
     supports_tools: true
     supports_json: true
@@ -46,8 +46,8 @@ models:
 
   - routing_tier: reasoning_primary
     provider: hosted
-    model_name: hosted-reasoning-model
-    deployment_name: reasoning-premium-v1
+    model_name: reasoning_model
+    deployment_name: reasoning_model
     role_tags: [premium, reasoning, architecture]
     supports_tools: true
     supports_json: true

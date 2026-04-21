@@ -1,0 +1,91 @@
+capabilities:
+  - name: trivial.respond
+    description: >
+      Short casual prompts, greetings, simple acknowledgements, and lightweight
+      conversational responses that do not need tools, code analysis, or deep
+      reasoning.
+    examples:
+      - hello
+      - thanks
+      - say hi in a friendly way
+      - what is your name?
+    anti_examples:
+      - research the latest pricing for GPUs
+      - implement a Python API client
+      - design a distributed job queue
+    default_signals:
+      needs_json: true
+      priority: latency
+      budget_mode: economy
+
+  - name: web.research
+    description: >
+      Requests that need current information, web lookup, URLs, research,
+      source comparison, or information that may change over time.
+    examples:
+      - research the latest Python release
+      - compare current pricing for cloud GPUs
+      - summarize this URL and cite sources
+      - find recent news about AI regulation
+    anti_examples:
+      - write a local sorting function
+      - say hello
+      - review this stack trace
+    default_signals:
+      needs_tools: true
+      long_context: true
+      priority: quality
+
+  - name: code.implement
+    description: >
+      Requests to write, modify, refactor, or implement code, tests, scripts,
+      APIs, features, functions, or repository changes.
+    examples:
+      - write a Python function to sort users
+      - implement this feature and add tests
+      - refactor the router module
+      - fix this bug in the parser
+    anti_examples:
+      - explain the latest weather
+      - compare architecture tradeoffs without code changes
+      - hello
+    default_signals:
+      needs_tools: true
+      needs_json: true
+      priority: quality
+
+  - name: code.verify
+    description: >
+      Requests to review, validate, debug, analyze failures, inspect stack
+      traces, explain test failures, or check existing code for correctness.
+    examples:
+      - review this pull request for bugs
+      - explain this stack trace
+      - why are these tests failing?
+      - verify this implementation
+    anti_examples:
+      - build a new feature from scratch
+      - research current documentation online
+      - say hello
+    default_signals:
+      needs_json: true
+      priority: reliability
+
+  - name: architecture.design
+    description: >
+      Requests about system architecture, design decisions, tradeoffs,
+      scalability, reliability, data flows, component boundaries, and
+      high-level technical plans.
+    examples:
+      - design a scalable notification system
+      - compare monolith and microservice tradeoffs
+      - propose an architecture for multi-tenant routing
+      - plan a reliable distributed queue
+    anti_examples:
+      - write a small sorting function
+      - look up current release notes
+      - hello
+    default_signals:
+      long_context: true
+      priority: quality
+      budget_mode: premium

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config_loader import load_model_tiers, load_task_profiles
+from .config_loader import (
+    load_capability_definitions,
+    load_model_tiers,
+    load_task_profiles,
+)
+from .intent.models import CapabilityResolution
+from .intent.resolver import IntentResolver, build_request_context
 from .models import (
     FilteredCandidate,
     ModelSelection,
@@ -21,19 +27,29 @@ class RoutingError(RuntimeError):
 
 
 class DeterministicRouter:
-    def __init__(self, models: tuple[ModelTier, ...], profiles: dict[str, TaskProfile]) -> None:
+    def __init__(
+        self,
+        models: tuple[ModelTier, ...],
+        profiles: dict[str, TaskProfile],
+        intent_resolver: IntentResolver | None = None,
+    ) -> None:
         self._models = models
         self._profiles = profiles
+        self._intent_resolver = intent_resolver
 
     @classmethod
     def from_yaml(
         cls,
         models_path: str | Path,
         task_profiles_path: str | Path,
+        capabilities_path: str | Path | None = None,
     ) -> "DeterministicRouter":
         models = load_model_tiers(models_path)
         profiles = load_task_profiles(task_profiles_path)
-        return cls(models=models, profiles=profiles)
+        intent_resolver = None
+        if capabilities_path is not None:
+            intent_resolver = IntentResolver(load_capability_definitions(capabilities_path))
+        return cls(models=models, profiles=profiles, intent_resolver=intent_resolver)
 
     def route(self, context: RequestContext) -> RoutingDecision:
         profile = self._resolve_profile(context.capability)
@@ -99,82 +115,19 @@ class DeterministicRouter:
         )
 
     def route_prompt(self, prompt: str) -> RoutingDecision:
-        return self.route(self.infer_context(prompt))
+        resolution = self.resolve_intent(prompt)
+        return self.route(build_request_context(resolution))
 
     def infer_context(self, prompt: str) -> RequestContext:
-        normalized = prompt.lower()
-        word_count = len(normalized.split())
-        long_context = word_count > 500
+        return build_request_context(self.resolve_intent(prompt))
 
-        if self._contains_any(
-            normalized,
-            (
-                "browse",
-                "current",
-                "latest",
-                "news",
-                "research",
-                "search",
-                "today",
-                "web",
-            ),
-        ):
-            return RequestContext(
-                capability="web.research",
-                needs_tools=True,
-                long_context=True,
-                priority="quality" if word_count > 40 else "balanced",
+    def resolve_intent(self, prompt: str) -> CapabilityResolution:
+        if self._intent_resolver is None:
+            raise RoutingError(
+                "Prompt routing requires an IntentResolver. "
+                "Pass capabilities_path to from_yaml(...) or use IntentResolver directly."
             )
-
-        if self._contains_any(
-            normalized,
-            (
-                "architecture",
-                "design a system",
-                "distributed system",
-                "scalable",
-                "tradeoff",
-                "trade-off",
-            ),
-        ):
-            return RequestContext(
-                capability="architecture.design",
-                long_context=long_context,
-                priority="quality",
-                budget_mode="premium",
-            )
-
-        if self._contains_any(
-            normalized,
-            (
-                "bug",
-                "code",
-                "debug",
-                "fix",
-                "function",
-                "implement",
-                "python",
-                "refactor",
-                "test",
-            ),
-        ):
-            return RequestContext(
-                capability="code.implement",
-                needs_tools=True,
-                needs_json=True,
-                long_context=long_context,
-                priority="quality",
-            )
-
-        return RequestContext(
-            capability="trivial.classify",
-            needs_json=True,
-            priority="latency",
-            budget_mode="economy",
-        )
-
-    def _contains_any(self, text: str, needles: tuple[str, ...]) -> bool:
-        return any(needle in text for needle in needles)
+        return self._intent_resolver.resolve(prompt)
 
     def _selection_from_candidate(self, candidate: RankedCandidate) -> ModelSelection:
         return ModelSelection(

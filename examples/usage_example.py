@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from ai_model_router.config_loader import load_capability_definitions
+from ai_model_router.intent import IntentResolver, build_request_context
 from ai_model_router.router import DeterministicRouter
 
 
@@ -9,7 +11,17 @@ router = DeterministicRouter.from_yaml(
     root / "config" / "task_profiles.yaml",
 )
 
-decision = router.route_prompt("hello")
+resolver = IntentResolver(
+    load_capability_definitions(root / "config" / "capabilities.yaml")
+)
+
+resolution = resolver.resolve("Design a scalable notification system")
+context = build_request_context(resolution)
+decision = router.route(context)
+
+print("capability:", resolution.capability)
+print("intent confidence:", resolution.confidence)
+print("intent debug:", list(resolution.debug))
 print("primary tier:", decision.primary.routing_tier)
 print("primary endpoint:", decision.primary)
 print("fallback tiers:", list(decision.fallback_routing_tiers))

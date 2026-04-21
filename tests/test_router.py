@@ -10,10 +10,11 @@ from ai_model_router.router import DeterministicRouter, RoutingError
 ROOT = Path(__file__).resolve().parents[1]
 MODELS = ROOT / "config" / "models.yaml"
 PROFILES = ROOT / "config" / "task_profiles.yaml"
+CAPABILITIES = ROOT / "config" / "capabilities.yaml"
 
 
 def _router() -> DeterministicRouter:
-    return DeterministicRouter.from_yaml(MODELS, PROFILES)
+    return DeterministicRouter.from_yaml(MODELS, PROFILES, CAPABILITIES)
 
 
 def test_trivial_prefers_local_fast() -> None:
@@ -36,7 +37,7 @@ def test_prompt_hello_routes_to_local_fast() -> None:
 
     decision = router.route_prompt("hello")
 
-    assert decision.capability == "trivial.classify"
+    assert decision.capability == "trivial.respond"
     assert decision.primary_routing_tier == "local_fast"
     assert decision.primary_model == "local_model"
 
@@ -75,7 +76,7 @@ def test_code_implement_prefers_coding_primary() -> None:
         )
     )
     assert decision.primary_routing_tier == "coding_primary"
-    assert decision.primary.deployment_name == "coding-primary-v3"
+    assert decision.primary.deployment_name == "coding_model"
 
 
 def test_architecture_design_retry_escalates_to_reasoning_primary() -> None:

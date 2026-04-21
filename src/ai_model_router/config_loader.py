@@ -5,6 +5,7 @@ from typing import Any
 
 import yaml
 
+from .intent.models import CapabilityDefinition
 from .models import (
     BudgetMode,
     Boosts,
@@ -175,3 +176,39 @@ def load_task_profiles(path: str | Path) -> dict[str, TaskProfile]:
         profiles[capability] = profile
 
     return profiles
+
+
+def load_capability_definitions(path: str | Path) -> tuple[CapabilityDefinition, ...]:
+    data = _read_yaml(path)
+    raw_capabilities = data.get("capabilities", [])
+    if not isinstance(raw_capabilities, list):
+        raise ValueError("'capabilities' must be a list")
+
+    capabilities: list[CapabilityDefinition] = []
+    seen_names: set[str] = set()
+    for item in raw_capabilities:
+        if not isinstance(item, dict):
+            raise ValueError("Each capability entry must be a mapping")
+
+        name = str(item["name"])
+        if name in seen_names:
+            raise ValueError(f"Duplicate capability definition: {name}")
+        seen_names.add(name)
+
+        default_signals = item.get("default_signals", {}) or {}
+        if not isinstance(default_signals, dict):
+            raise ValueError(f"default_signals must be a mapping for capability: {name}")
+
+        capabilities.append(
+            CapabilityDefinition(
+                name=name,
+                description=str(item.get("description", "")),
+                examples=tuple(str(value) for value in item.get("examples", [])),
+                anti_examples=tuple(
+                    str(value) for value in item.get("anti_examples", [])
+                ),
+                default_signals=dict(default_signals),
+            )
+        )
+
+    return tuple(capabilities)
