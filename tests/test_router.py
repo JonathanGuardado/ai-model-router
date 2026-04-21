@@ -21,7 +21,7 @@ def _router_with_prompt_helper() -> DeterministicRouter:
     return DeterministicRouter.from_yaml(MODELS, PROFILES, CAPABILITIES)
 
 
-def test_trivial_prefers_local_fast() -> None:
+def test_route_with_explicit_trivial_capability_prefers_local_fast() -> None:
     router = _router()
     decision = router.route(
         RequestContext(
@@ -55,7 +55,7 @@ def test_route_prompt_convenience_uses_intent_resolver_for_code_request() -> Non
     assert decision.primary_routing_tier == "coding_primary"
 
 
-def test_web_research_requires_tools_and_long_context() -> None:
+def test_route_with_explicit_web_research_capability_requires_tools() -> None:
     router = _router()
     decision = router.route(
         RequestContext(
@@ -69,7 +69,7 @@ def test_web_research_requires_tools_and_long_context() -> None:
     assert any(c.routing_tier == "local_fast" for c in decision.filtered_candidates)
 
 
-def test_code_implement_prefers_coding_primary() -> None:
+def test_route_with_explicit_code_capability_prefers_coding_primary() -> None:
     router = _router()
     decision = router.route(
         RequestContext(

@@ -1,48 +1,39 @@
 # ai-model-router
 
-A lightweight, deterministic intent and model routing package.
+A lightweight, deterministic package for intent resolution and model routing.
 
 - Selection only (no model execution)
 - Intent resolution converts free-form text into internal capabilities
 - Model routing converts structured capabilities into model selections
-- Router remains filter-first, then score
+- Model routing remains filter-first, then score
 - YAML-driven capability, model, task profile, and routing policy config
 - Separate routing tiers from provider model/deployment endpoints
 - Deterministic ranked output with fallback chain and structured score/debug reasons
 
 ## Recommended Flow
 
-Use the two layers explicitly:
+Use the layers explicitly:
 
 ```text
-IntentResolver.resolve(text)
-  -> CapabilityResolution
-build_request_context(resolution)
-  -> RequestContext
-DeterministicRouter.route(context)
-  -> RoutingDecision
+IntentResolver.resolve(text) -> CapabilityResolution
+build_request_context(resolution) -> RequestContext
+DeterministicRouter.route(context) -> RoutingDecision
 ```
-
-In other words:
 
 - `IntentResolver` turns free-form text into a `CapabilityResolution`.
 - `build_request_context(...)` converts that resolution into a router-ready `RequestContext`.
 - Model routing, implemented by `DeterministicRouter`, turns a `RequestContext` into a `RoutingDecision`.
 
-## Two Layers
+## Components
 
 `IntentResolver` answers: "What kind of task is this text asking for?"
 
-Input: free-form text
-
-Output: `CapabilityResolution`
+Input: free-form text. Output: `CapabilityResolution`.
 
 `DeterministicRouter` is the model router. It answers: "Which configured model
 tier should handle this task?"
 
-Input: `RequestContext`
-
-Output: `RoutingDecision`
+Input: `RequestContext`. Output: `RoutingDecision`.
 
 No remote calls or LLM classification calls are used in the normal path.
 
@@ -59,11 +50,14 @@ structured routing decision.
 3. Edit [config/task_profiles.yaml](config/task_profiles.yaml)
 4. Resolve intent, build a `RequestContext`, and route it
 
-See [examples/usage_example.py](examples/usage_example.py) for free-form text
-to intent resolution to model routing.
+See [examples/usage_example.py](examples/usage_example.py) for:
+
+```text
+free-form input -> intent resolution -> request context -> model routing
+```
 
 See [examples/direct_route_example.py](examples/direct_route_example.py) for
-direct `RequestContext` to model routing.
+direct routing with a pre-built `RequestContext`.
 
 ```python
 from ai_model_router.config_loader import load_capability_definitions
@@ -92,18 +86,11 @@ intent resolution and model routing.
 
 ## Config shape
 
-`capabilities.yaml` describes intent categories. Each capability has a name,
-description, examples, anti-examples, and default request signals.
+- `capabilities.yaml` describes intent categories with names, descriptions, examples, anti-examples, and default request signals.
+- `models.yaml` describes available endpoint candidates. `routing_tier` is the stable policy-facing name used by profiles, while `provider`, `model_name`, and `deployment_name` describe the integration endpoint.
+- `task_profiles.yaml` describes routing policy per capability: required constraints, base scoring weights, priority/budget weight adjustments, boosts, penalties, retry escalation, and fallback count.
 
-`models.yaml` describes available endpoint candidates. `routing_tier` is the stable
-policy-facing name used by profiles, while `provider`, `model_name`, and
-`deployment_name` describe the integration endpoint.
-
-`task_profiles.yaml` describes routing policy per capability: required constraints,
-base scoring weights, priority/budget weight adjustments, boosts, penalties,
-retry escalation, and fallback count.
-
-## Intent Resolution
+## Intent Resolution Details
 
 Intent resolution is deterministic and layered:
 

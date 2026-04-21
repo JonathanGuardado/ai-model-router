@@ -19,9 +19,10 @@ resolution = resolver.resolve("Design a scalable notification system")
 context = build_request_context(resolution)
 decision = router.route(context)
 
-print("capability:", resolution.capability)
+print("resolved capability:", resolution.capability)
 print("intent confidence:", resolution.confidence)
 print("intent debug:", list(resolution.debug))
+print("request context:", context)
 print("primary tier:", decision.primary.routing_tier)
 print("primary endpoint:", decision.primary)
 print("fallback tiers:", list(decision.fallback_routing_tiers))
@@ -33,4 +34,4 @@ print(
     "score breakdown:",
     [(c.name, c.value, c.details) for c in decision.ranked_candidates[0].score_components],
 )
-print("debug:", list(decision.debug_reasons))
+print("router debug:", list(decision.debug_reasons))

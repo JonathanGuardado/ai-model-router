@@ -18,7 +18,7 @@ context = RequestContext(
 )
 decision = router.route(context)
 
-print("capability:", context.capability)
+print("request context:", context)
 print("primary tier:", decision.primary.routing_tier)
 print("primary endpoint:", decision.primary)
 print("fallback tiers:", list(decision.fallback_routing_tiers))

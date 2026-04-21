@@ -75,7 +75,7 @@ def test_builds_request_context_from_resolution() -> None:
     assert context.priority == "quality"
 
 
-def test_end_to_end_resolve_context_then_route() -> None:
+def test_end_to_end_resolve_build_context_then_route() -> None:
     resolver = _resolver()
     router = DeterministicRouter.from_yaml(MODELS, PROFILES)
     resolution = resolver.resolve("Write a Python function and tests for sorting users.")
