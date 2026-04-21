@@ -1,63 +1,21 @@
 # ai-model-router
 
-A lightweight, deterministic package for intent resolution and model routing.
+Deterministic intent resolution and model routing for selection-only AI systems.
 
-- Selection only (no model execution)
-- Intent resolution converts free-form text into internal capabilities
-- Model routing converts structured capabilities into model selections
-- Model routing remains filter-first, then score
-- YAML-driven capability, model, task profile, and routing policy config
-- Separate routing tiers from provider model/deployment endpoints
-- Deterministic ranked output with fallback chain and structured score/debug reasons
+## What It Does
 
-## Recommended Flow
+- Resolves free-form text into an internal capability.
+- Converts that capability into a `RequestContext`.
+- Selects a primary model tier and fallback tiers.
+- Returns routing metadata without executing any model.
 
-Use the layers explicitly:
+## Main Flow
 
 ```text
-IntentResolver.resolve(text) -> CapabilityResolution
-build_request_context(resolution) -> RequestContext
-DeterministicRouter.route(context) -> RoutingDecision
+IntentResolver.resolve(...)
+-> build_request_context(...)
+-> DeterministicRouter.route(...)
 ```
-
-- `IntentResolver` turns free-form text into a `CapabilityResolution`.
-- `build_request_context(...)` converts that resolution into a router-ready `RequestContext`.
-- Model routing, implemented by `DeterministicRouter`, turns a `RequestContext` into a `RoutingDecision`.
-
-## Components
-
-`IntentResolver` answers: "What kind of task is this text asking for?"
-
-Input: free-form text. Output: `CapabilityResolution`.
-
-`DeterministicRouter` is the model router. It answers: "Which configured model
-tier should handle this task?"
-
-Input: `RequestContext`. Output: `RoutingDecision`.
-
-No remote calls or LLM classification calls are used in the normal path.
-
-## What This Repo Does Not Do
-
-This package does not execute models, call providers, orchestrate workflows,
-manage agents, or integrate with external tools. It stops after producing a
-structured routing decision.
-
-## Quick start
-
-1. Edit [config/capabilities.yaml](config/capabilities.yaml)
-2. Edit [config/models.yaml](config/models.yaml)
-3. Edit [config/task_profiles.yaml](config/task_profiles.yaml)
-4. Resolve intent, build a `RequestContext`, and route it
-
-See [examples/usage_example.py](examples/usage_example.py) for:
-
-```text
-free-form input -> intent resolution -> request context -> model routing
-```
-
-See [examples/direct_route_example.py](examples/direct_route_example.py) for
-direct routing with a pre-built `RequestContext`.
 
 ```python
 from ai_model_router.config_loader import load_capability_definitions
@@ -70,7 +28,7 @@ router = DeterministicRouter.from_yaml(
     "config/task_profiles.yaml",
 )
 
-resolution = resolver.resolve("hello")
+resolution = resolver.resolve("Design a scalable notification system")
 context = build_request_context(resolution)
 decision = router.route(context)
 
@@ -78,45 +36,28 @@ print(resolution.capability)
 print(decision.primary)
 ```
 
-`DeterministicRouter.route_prompt(...)` exists as a convenience helper when the
-router is constructed with `capabilities_path`, but it is not the recommended
-main flow. Prefer using `IntentResolver.resolve(...)` and
-`build_request_context(...)` explicitly when you want clear separation between
-intent resolution and model routing.
+`route_prompt(...)` exists as a convenience helper, but the explicit flow above is
+the recommended path.
 
-## Config shape
+## Example Capabilities
 
-- `capabilities.yaml` describes intent categories with names, descriptions, examples, anti-examples, and default request signals.
-- `models.yaml` describes available endpoint candidates. `routing_tier` is the stable policy-facing name used by profiles, while `provider`, `model_name`, and `deployment_name` describe the integration endpoint.
-- `task_profiles.yaml` describes routing policy per capability: required constraints, base scoring weights, priority/budget weight adjustments, boosts, penalties, retry escalation, and fallback count.
+- `trivial.respond`
+- `web.research`
+- `code.implement`
+- `code.verify`
+- `architecture.design`
 
-## Intent Resolution Details
+## What It Does Not Do
 
-Intent resolution is deterministic and layered:
+- Does not execute model calls.
+- Does not call providers or remote APIs.
+- Does not orchestrate workflows or agents.
+- Does not integrate with Slack, Jira, LangGraph, OpenRouter, or LiteLLM.
 
-- Semantic capability matching compares input text against configured capability descriptions, examples, and anti-examples using a local matcher.
-- Structural heuristics apply small explainable score adjustments for signals like greetings, URLs, code blocks, stack traces, file paths, implementation language, and architecture language.
-- Ambiguity handling marks weak or close results as ambiguous, returns top candidates with confidence, and falls back safely without remote calls.
+## Config
 
-The matcher is pluggable, so the default local matcher can later be replaced with
-a local embedding matcher or classifier without changing the router.
+Configuration lives in `config/`:
 
-## Result shape
-
-`route(...)` returns a `RoutingDecision` with:
-
-- `primary`: selected `ModelSelection` endpoint details
-- `fallbacks`: ordered fallback endpoint details
-- `ranked_candidates`: all compatible candidates with score components
-- `filtered_candidates`: candidates excluded during compatibility filtering
-- `debug_reasons`: compact string reasons for logs
-
-`IntentResolver.resolve(...)` returns a `CapabilityResolution` with:
-
-- `capability`: selected internal capability
-- `confidence`: deterministic confidence derived from candidate separation
-- `source`: `semantic`, `ambiguous`, or `default`
-- `ambiguous`: whether the result is weak or close
-- `signals`: default and structural signals used to build `RequestContext`
-- `candidates`: ranked capability candidates
-- `debug`: explainable resolution details
+- `capabilities.yaml`: intent categories and default request signals
+- `models.yaml`: available model tiers and endpoint metadata
+- `task_profiles.yaml`: routing policy per capability
