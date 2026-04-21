@@ -1,0 +1,25 @@
+[project]
+name = "ai-model-router"
+version = "0.1.0"
+description = "Deterministic, capability-based AI model router"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

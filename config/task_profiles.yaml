@@ -1,0 +1,163 @@
+task_profiles:
+  - capability: default
+    preferred_tiers: []
+    preferred_tags: []
+    required_constraints: {}
+    scoring_weights:
+      coding: 0.8
+      reasoning: 0.8
+      latency: 0.7
+      cost: 0.7
+      reliability: 1.0
+    boosts:
+      preferred_tier: 1.0
+      preferred_tag: 0.6
+      retry_premium: 1.5
+    penalties:
+      low_reliability_threshold: 6.0
+      low_reliability: 2.0
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.0
+    fallback_count: 2
+
+  - capability: trivial.classify
+    preferred_tiers: [local_fast]
+    preferred_tags: [trivial, fast]
+    required_constraints:
+      supports_json: true
+    scoring_weights:
+      coding: 0.2
+      reasoning: 0.3
+      latency: 1.3
+      cost: 1.5
+      reliability: 0.6
+    boosts:
+      preferred_tier: 2.0
+      preferred_tag: 1.0
+      retry_premium: 0.5
+    penalties:
+      low_reliability_threshold: 5.0
+      low_reliability: 1.5
+    escalation:
+      premium_on_retry: false
+      retry_reasoning_threshold: 9.0
+    fallback_count: 2
+
+  - capability: web.research
+    preferred_tiers: [web_agent]
+    preferred_tags: [web, research]
+    required_constraints:
+      supports_tools: true
+      long_context: true
+      required_role_tags: [web]
+    scoring_weights:
+      coding: 0.3
+      reasoning: 1.0
+      latency: 0.5
+      cost: 0.4
+      reliability: 1.0
+    boosts:
+      preferred_tier: 2.0
+      preferred_tag: 1.0
+      retry_premium: 1.0
+    penalties:
+      low_reliability_threshold: 7.0
+      low_reliability: 1.0
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.5
+    fallback_count: 2
+
+  - capability: code.implement
+    preferred_tiers: [coding_primary]
+    preferred_tags: [coding]
+    required_constraints:
+      supports_tools: true
+      supports_json: true
+    scoring_weights:
+      coding: 1.8
+      reasoning: 0.7
+      latency: 0.5
+      cost: 0.4
+      reliability: 1.0
+    boosts:
+      preferred_tier: 2.5
+      preferred_tag: 1.0
+      retry_premium: 1.2
+    penalties:
+      low_reliability_threshold: 7.0
+      low_reliability: 1.5
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.5
+    fallback_count: 2
+
+  - capability: architecture.design
+    preferred_tiers: [reasoning_primary]
+    preferred_tags: [architecture, premium]
+    required_constraints:
+      long_context: true
+    scoring_weights:
+      coding: 0.4
+      reasoning: 2.2
+      latency: 0.2
+      cost: 0.2
+      reliability: 1.2
+    boosts:
+      preferred_tier: 3.0
+      preferred_tag: 1.5
+      retry_premium: 2.0
+    penalties:
+      low_reliability_threshold: 7.5
+      low_reliability: 2.0
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.0
+    fallback_count: 2
+
+  - capability: code.verify
+    preferred_tiers: [coding_primary]
+    preferred_tags: [coding]
+    required_constraints:
+      supports_json: true
+    scoring_weights:
+      coding: 1.2
+      reasoning: 1.0
+      latency: 0.4
+      cost: 0.5
+      reliability: 1.5
+    boosts:
+      preferred_tier: 1.5
+      preferred_tag: 0.8
+      retry_premium: 1.6
+    penalties:
+      low_reliability_threshold: 7.0
+      low_reliability: 2.0
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.5
+    fallback_count: 2
+
+  - capability: tests.analyze
+    preferred_tiers: [coding_primary]
+    preferred_tags: [coding]
+    required_constraints:
+      supports_json: true
+    scoring_weights:
+      coding: 1.0
+      reasoning: 1.0
+      latency: 0.3
+      cost: 0.5
+      reliability: 1.4
+    boosts:
+      preferred_tier: 1.3
+      preferred_tag: 0.8
+      retry_premium: 1.7
+    penalties:
+      low_reliability_threshold: 7.0
+      low_reliability: 1.5
+    escalation:
+      premium_on_retry: true
+      retry_reasoning_threshold: 8.5
+    fallback_count: 2

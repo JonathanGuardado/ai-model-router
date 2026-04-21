@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/ai_model_router/__init__.py
+src/ai_model_router/config_loader.py
+src/ai_model_router/models.py
+src/ai_model_router/router.py
+src/ai_model_router.egg-info/PKG-INFO
+src/ai_model_router.egg-info/SOURCES.txt
+src/ai_model_router.egg-info/dependency_links.txt
+src/ai_model_router.egg-info/requires.txt
+src/ai_model_router.egg-info/top_level.txt
+tests/test_router.py
