@@ -118,12 +118,6 @@ class DeterministicSelector:
         resolution = self.resolve_intent(prompt)
         return self.select(build_request_context(resolution))
 
-    def route(self, context: RequestContext) -> SelectionDecision:
-        return self.select(context)
-
-    def route_prompt(self, prompt: str) -> SelectionDecision:
-        return self.select_prompt(prompt)
-
     def infer_context(self, prompt: str) -> RequestContext:
         return build_request_context(self.resolve_intent(prompt))
 
@@ -373,7 +367,3 @@ class DeterministicSelector:
             if value != 0:
                 parts.append(f"{name}:{value:+.2f}")
         return ",".join(parts) if parts else "no-op"
-
-
-DeterministicRouter = DeterministicSelector
-RoutingError = SelectionError

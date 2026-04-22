@@ -35,10 +35,6 @@ class ModelTier:
     reliability_score: float
     enabled: bool = True
 
-    @property
-    def routing_tier(self) -> str:
-        return self.selection_tier
-
 
 @dataclass(frozen=True, slots=True)
 class RequiredConstraints:
@@ -98,10 +94,6 @@ class ModelSelection:
     model_name: str
     deployment_name: str
 
-    @property
-    def routing_tier(self) -> str:
-        return self.selection_tier
-
 
 @dataclass(frozen=True, slots=True)
 class ScoreComponent:
@@ -115,10 +107,6 @@ class FilteredCandidate:
     selection_tier: str
     reasons: tuple[str, ...]
 
-    @property
-    def routing_tier(self) -> str:
-        return self.selection_tier
-
 
 @dataclass(frozen=True, slots=True)
 class RankedCandidate:
@@ -129,10 +117,6 @@ class RankedCandidate:
     score: float
     score_components: tuple[ScoreComponent, ...]
     reasons: tuple[str, ...]
-
-    @property
-    def routing_tier(self) -> str:
-        return self.selection_tier
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,20 +138,9 @@ class SelectionDecision:
         return self.primary.selection_tier
 
     @property
-    def primary_routing_tier(self) -> str:
-        return self.primary_selection_tier
-
-    @property
     def fallback_models(self) -> tuple[str, ...]:
         return tuple(fallback.model_name for fallback in self.fallbacks)
 
     @property
     def fallback_selection_tiers(self) -> tuple[str, ...]:
         return tuple(fallback.selection_tier for fallback in self.fallbacks)
-
-    @property
-    def fallback_routing_tiers(self) -> tuple[str, ...]:
-        return self.fallback_selection_tiers
-
-
-RoutingDecision = SelectionDecision

@@ -79,9 +79,7 @@ def load_model_tiers(path: str | Path) -> tuple[ModelTier, ...]:
         if not isinstance(item, dict):
             raise ValueError("Each model entry must be a mapping")
 
-        selection_tier = str(
-            item.get("selection_tier", item.get("routing_tier", item.get("name")))
-        )
+        selection_tier = str(item.get("selection_tier", item.get("name")))
         if selection_tier in seen_names:
             raise ValueError(f"Duplicate selection tier: {selection_tier}")
         seen_names.add(selection_tier)

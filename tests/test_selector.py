@@ -229,10 +229,3 @@ task_profiles:
 
     with pytest.raises(ValueError, match="Unknown .*priority_weight_adjustments key"):
         load_task_profiles(profiles_path)
-
-
-def test_legacy_router_imports_still_resolve() -> None:
-    from ai_model_router.router import DeterministicRouter, RoutingError
-
-    assert DeterministicRouter is DeterministicSelector
-    assert RoutingError is SelectionError

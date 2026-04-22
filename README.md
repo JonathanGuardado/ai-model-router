@@ -1,13 +1,13 @@
 # ai-model-selector
 
-Deterministic intent resolution and model selection for agentic AI systems.
+Deterministic intent resolution and model selection for AI systems.
 
 ## What It Does
 
 - Resolves free-form text into an internal capability.
 - Converts that capability into a `RequestContext`.
 - Selects a primary model tier and fallback tiers.
-- Returns selection metadata for downstream routing or execution.
+- Returns selection metadata for downstream execution.
 
 ## Main Flow
 
