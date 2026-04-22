@@ -1,43 +1,42 @@
-# ai-model-router
+# ai-model-selector
 
-Deterministic intent resolution and model routing for selection-only AI systems.
+Deterministic intent resolution and model selection for agentic AI systems.
 
 ## What It Does
 
 - Resolves free-form text into an internal capability.
 - Converts that capability into a `RequestContext`.
 - Selects a primary model tier and fallback tiers.
-- Returns routing metadata without executing any model.
+- Returns selection metadata for downstream routing or execution.
 
 ## Main Flow
 
 ```text
 IntentResolver.resolve(...)
 -> build_request_context(...)
--> DeterministicRouter.route(...)
+-> DeterministicSelector.select(...)
 ```
 
 ```python
-from ai_model_router.config_loader import load_capability_definitions
-from ai_model_router.intent import IntentResolver, build_request_context
-from ai_model_router.router import DeterministicRouter
+from ai_model_selector.config_loader import load_capability_definitions
+from ai_model_selector.intent import IntentResolver, build_request_context
+from ai_model_selector.selector import DeterministicSelector
 
 resolver = IntentResolver(load_capability_definitions("config/capabilities.yaml"))
-router = DeterministicRouter.from_yaml(
+selector = DeterministicSelector.from_yaml(
     "config/models.yaml",
     "config/task_profiles.yaml",
 )
 
 resolution = resolver.resolve("Design a scalable notification system")
 context = build_request_context(resolution)
-decision = router.route(context)
+decision = selector.select(context)
 
 print(resolution.capability)
 print(decision.primary)
 ```
 
-`route_prompt(...)` exists as a convenience helper, but the explicit flow above is
-the recommended path.
+`select_prompt(...)` is available as a convenience helper, but the explicit flow above is the recommended integration path.
 
 ## Example Capabilities
 
@@ -52,12 +51,12 @@ the recommended path.
 - Does not execute model calls.
 - Does not call providers or remote APIs.
 - Does not orchestrate workflows or agents.
-- Does not integrate with Slack, Jira, LangGraph, OpenRouter, or LiteLLM.
+- Does not include runtime or tool execution integrations.
 
 ## Config
 
-Configuration lives in `config/`:
+Configuration is defined in `config/`:
 
 - `capabilities.yaml`: intent categories and default request signals
 - `models.yaml`: available model tiers and endpoint metadata
-- `task_profiles.yaml`: routing policy per capability
+- `task_profiles.yaml`: selection policy per capability

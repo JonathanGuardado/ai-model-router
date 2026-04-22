@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from ai_model_router.config_loader import load_task_profiles
-from ai_model_router.models import ModelTier, RequestContext, RequiredConstraints, TaskProfile
-from ai_model_router.router import DeterministicRouter, RoutingError
+from ai_model_selector.config_loader import load_task_profiles
+from ai_model_selector.models import ModelTier, RequestContext, RequiredConstraints, TaskProfile
+from ai_model_selector.selector import DeterministicSelector, SelectionError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,65 +13,65 @@ PROFILES = ROOT / "config" / "task_profiles.yaml"
 CAPABILITIES = ROOT / "config" / "capabilities.yaml"
 
 
-def _router() -> DeterministicRouter:
-    return DeterministicRouter.from_yaml(MODELS, PROFILES)
+def _selector() -> DeterministicSelector:
+    return DeterministicSelector.from_yaml(MODELS, PROFILES)
 
 
-def _router_with_prompt_helper() -> DeterministicRouter:
-    return DeterministicRouter.from_yaml(MODELS, PROFILES, CAPABILITIES)
+def _selector_with_prompt_helper() -> DeterministicSelector:
+    return DeterministicSelector.from_yaml(MODELS, PROFILES, CAPABILITIES)
 
 
-def test_route_with_explicit_trivial_capability_prefers_local_fast() -> None:
-    router = _router()
-    decision = router.route(
+def test_select_with_explicit_trivial_capability_prefers_local_fast() -> None:
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="trivial.classify",
             needs_json=True,
             budget_mode="economy",
         )
     )
-    assert decision.primary_routing_tier == "local_fast"
+    assert decision.primary_selection_tier == "local_fast"
     assert decision.primary_model == "local_model"
     assert decision.primary.provider == "local"
     assert len(decision.fallback_models) == 2
 
 
-def test_route_prompt_convenience_uses_intent_resolver_for_hello() -> None:
-    router = _router_with_prompt_helper()
+def test_select_prompt_convenience_uses_intent_resolver_for_hello() -> None:
+    selector = _selector_with_prompt_helper()
 
-    decision = router.route_prompt("hello")
+    decision = selector.select_prompt("hello")
 
     assert decision.capability == "trivial.respond"
-    assert decision.primary_routing_tier == "local_fast"
+    assert decision.primary_selection_tier == "local_fast"
     assert decision.primary_model == "local_model"
 
 
-def test_route_prompt_convenience_uses_intent_resolver_for_code_request() -> None:
-    router = _router_with_prompt_helper()
+def test_select_prompt_convenience_uses_intent_resolver_for_code_request() -> None:
+    selector = _selector_with_prompt_helper()
 
-    decision = router.route_prompt("Write a Python function and tests for sorting users")
+    decision = selector.select_prompt("Write a Python function and tests for sorting users")
 
     assert decision.capability == "code.implement"
-    assert decision.primary_routing_tier == "coding_primary"
+    assert decision.primary_selection_tier == "coding_primary"
 
 
-def test_route_with_explicit_web_research_capability_requires_tools() -> None:
-    router = _router()
-    decision = router.route(
+def test_select_with_explicit_web_research_capability_requires_tools() -> None:
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="web.research",
             needs_tools=True,
             long_context=True,
         )
     )
-    assert decision.primary_routing_tier == "web_agent"
-    assert "local_fast" not in [c.routing_tier for c in decision.ranked_candidates]
-    assert any(c.routing_tier == "local_fast" for c in decision.filtered_candidates)
+    assert decision.primary_selection_tier == "web_agent"
+    assert "local_fast" not in [c.selection_tier for c in decision.ranked_candidates]
+    assert any(c.selection_tier == "local_fast" for c in decision.filtered_candidates)
 
 
-def test_route_with_explicit_code_capability_prefers_coding_primary() -> None:
-    router = _router()
-    decision = router.route(
+def test_select_with_explicit_code_capability_prefers_coding_primary() -> None:
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="code.implement",
             needs_tools=True,
@@ -79,13 +79,13 @@ def test_route_with_explicit_code_capability_prefers_coding_primary() -> None:
             priority="quality",
         )
     )
-    assert decision.primary_routing_tier == "coding_primary"
+    assert decision.primary_selection_tier == "coding_primary"
     assert decision.primary.deployment_name == "coding_model"
 
 
 def test_architecture_design_retry_escalates_to_reasoning_primary() -> None:
-    router = _router()
-    decision = router.route(
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="architecture.design",
             retry_count=1,
@@ -94,42 +94,42 @@ def test_architecture_design_retry_escalates_to_reasoning_primary() -> None:
             budget_mode="premium",
         )
     )
-    assert decision.primary_routing_tier == "reasoning_primary"
+    assert decision.primary_selection_tier == "reasoning_primary"
 
 
 def test_deterministic_same_input_same_output() -> None:
-    router = _router()
+    selector = _selector()
     context = RequestContext(
         capability="tests.analyze",
         needs_json=True,
         retry_count=1,
     )
-    first = router.route(context)
-    second = router.route(context)
+    first = selector.select(context)
+    second = selector.select(context)
 
-    assert first.primary_routing_tier == second.primary_routing_tier
-    assert first.fallback_routing_tiers == second.fallback_routing_tiers
-    assert [c.routing_tier for c in first.ranked_candidates] == [
-        c.routing_tier for c in second.ranked_candidates
+    assert first.primary_selection_tier == second.primary_selection_tier
+    assert first.fallback_selection_tiers == second.fallback_selection_tiers
+    assert [c.selection_tier for c in first.ranked_candidates] == [
+        c.selection_tier for c in second.ranked_candidates
     ]
 
 
 def test_budget_economy_in_default_profile_prefers_local_fast() -> None:
-    router = _router()
-    decision = router.route(
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="unknown.capability",
             budget_mode="economy",
             priority="latency",
         )
     )
-    assert decision.primary_routing_tier == "local_fast"
+    assert decision.primary_selection_tier == "local_fast"
     assert decision.profile == "default"
 
 
 def test_score_breakdown_includes_configured_policy_adjustments() -> None:
-    router = _router()
-    decision = router.route(
+    selector = _selector()
+    decision = selector.select(
         RequestContext(
             capability="code.implement",
             needs_tools=True,
@@ -148,11 +148,11 @@ def test_score_breakdown_includes_configured_policy_adjustments() -> None:
     assert any(reason.startswith("priority_quality:") for reason in primary.reasons)
 
 
-def test_route_raises_when_no_compatible_model() -> None:
-    router = DeterministicRouter(
+def test_select_raises_when_no_compatible_model() -> None:
+    selector = DeterministicSelector(
         models=(
             ModelTier(
-                routing_tier="plain_text_only",
+                selection_tier="plain_text_only",
                 provider="local",
                 model_name="plain-text-only",
                 deployment_name="plain-text-only-v1",
@@ -175,8 +175,8 @@ def test_route_raises_when_no_compatible_model() -> None:
         },
     )
 
-    with pytest.raises(RoutingError):
-        router.route(
+    with pytest.raises(SelectionError):
+        selector.select(
             RequestContext(
                 capability="web.research",
                 needs_tools=True,
@@ -186,13 +186,13 @@ def test_route_raises_when_no_compatible_model() -> None:
         )
 
 
-def test_deterministic_tie_breaks_by_routing_tier() -> None:
-    def model(routing_tier: str) -> ModelTier:
+def test_deterministic_tie_breaks_by_selection_tier() -> None:
+    def model(selection_tier: str) -> ModelTier:
         return ModelTier(
-            routing_tier=routing_tier,
+            selection_tier=selection_tier,
             provider="hosted",
-            model_name=f"{routing_tier}-model",
-            deployment_name=f"{routing_tier}-deployment",
+            model_name=f"{selection_tier}-model",
+            deployment_name=f"{selection_tier}-deployment",
             role_tags=(),
             supports_tools=True,
             supports_json=True,
@@ -204,14 +204,14 @@ def test_deterministic_tie_breaks_by_routing_tier() -> None:
             reliability_score=5.0,
         )
 
-    router = DeterministicRouter(
+    selector = DeterministicSelector(
         models=(model("beta"), model("alpha")),
         profiles={"default": TaskProfile(capability="default")},
     )
 
-    decision = router.route(RequestContext(capability="default"))
+    decision = selector.select(RequestContext(capability="default"))
 
-    assert [c.routing_tier for c in decision.ranked_candidates] == ["alpha", "beta"]
+    assert [c.selection_tier for c in decision.ranked_candidates] == ["alpha", "beta"]
 
 
 def test_invalid_policy_adjustment_key_is_rejected(tmp_path: Path) -> None:
@@ -229,3 +229,10 @@ task_profiles:
 
     with pytest.raises(ValueError, match="Unknown .*priority_weight_adjustments key"):
         load_task_profiles(profiles_path)
+
+
+def test_legacy_router_imports_still_resolve() -> None:
+    from ai_model_router.router import DeterministicRouter, RoutingError
+
+    assert DeterministicRouter is DeterministicSelector
+    assert RoutingError is SelectionError

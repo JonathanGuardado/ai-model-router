@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from ai_model_router.config_loader import load_capability_definitions
-from ai_model_router.intent import IntentResolver, build_request_context
-from ai_model_router.router import DeterministicRouter
+from ai_model_selector.config_loader import load_capability_definitions
+from ai_model_selector.intent import IntentResolver, build_request_context
+from ai_model_selector.selector import DeterministicSelector
 
 ROOT = Path(__file__).resolve().parents[1]
 CAPABILITIES = ROOT / "config" / "capabilities.yaml"
@@ -75,13 +75,13 @@ def test_builds_request_context_from_resolution() -> None:
     assert context.priority == "quality"
 
 
-def test_end_to_end_resolve_build_context_then_route() -> None:
+def test_end_to_end_resolve_build_context_then_select() -> None:
     resolver = _resolver()
-    router = DeterministicRouter.from_yaml(MODELS, PROFILES)
+    selector = DeterministicSelector.from_yaml(MODELS, PROFILES)
     resolution = resolver.resolve("Write a Python function and tests for sorting users.")
     context = build_request_context(resolution)
 
-    decision = router.route(context)
+    decision = selector.select(context)
 
     assert resolution.capability == "code.implement"
-    assert decision.primary_routing_tier == "coding_primary"
+    assert decision.primary_selection_tier == "coding_primary"

@@ -1,12 +1,2 @@
-from .models import CapabilityCandidate, CapabilityDefinition, CapabilityResolution
-from .resolver import IntentResolver, build_request_context
-from .semantic_matcher import LocalSemanticMatcher
+from ai_model_selector.intent import *  # noqa: F403
 
-__all__ = [
-    "CapabilityCandidate",
-    "CapabilityDefinition",
-    "CapabilityResolution",
-    "IntentResolver",
-    "LocalSemanticMatcher",
-    "build_request_context",
-]

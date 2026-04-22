@@ -1,5 +1,5 @@
 models:
-  - routing_tier: local_fast
+  - selection_tier: local_fast
     provider: local
     model_name: local_model
     deployment_name: local_model
@@ -14,7 +14,7 @@ models:
     reliability_score: 6.0
     enabled: true
 
-  - routing_tier: web_agent
+  - selection_tier: web_agent
     provider: hosted
     model_name: web_model
     deployment_name: web_model
@@ -29,7 +29,7 @@ models:
     reliability_score: 7.0
     enabled: true
 
-  - routing_tier: coding_primary
+  - selection_tier: coding_primary
     provider: hosted
     model_name: coding_model
     deployment_name: coding_model
@@ -44,7 +44,7 @@ models:
     reliability_score: 8.0
     enabled: true
 
-  - routing_tier: reasoning_primary
+  - selection_tier: reasoning_primary
     provider: hosted
     model_name: reasoning_model
     deployment_name: reasoning_model

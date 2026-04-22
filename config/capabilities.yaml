@@ -43,7 +43,7 @@ capabilities:
     examples:
       - write a Python function to sort users
       - implement this feature and add tests
-      - refactor the router module
+      - refactor the selector module
       - fix this bug in the parser
     anti_examples:
       - explain the latest weather
@@ -79,7 +79,7 @@ capabilities:
     examples:
       - design a scalable notification system
       - compare monolith and microservice tradeoffs
-      - propose an architecture for multi-tenant routing
+      - propose an architecture for multi-tenant model selection
       - plan a reliable distributed queue
     anti_examples:
       - write a small sorting function

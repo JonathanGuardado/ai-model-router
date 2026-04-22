@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from ai_model_router.models import RequestContext
-from ai_model_router.router import DeterministicRouter
+from ai_model_selector.models import RequestContext
+from ai_model_selector.selector import DeterministicSelector
 
 
 root = Path(__file__).resolve().parents[1]
-router = DeterministicRouter.from_yaml(
+selector = DeterministicSelector.from_yaml(
     root / "config" / "models.yaml",
     root / "config" / "task_profiles.yaml",
 )
@@ -16,9 +16,9 @@ context = RequestContext(
     needs_json=True,
     priority="quality",
 )
-decision = router.route(context)
+decision = selector.select(context)
 
 print("request context:", context)
-print("primary tier:", decision.primary.routing_tier)
+print("primary tier:", decision.primary.selection_tier)
 print("primary endpoint:", decision.primary)
-print("fallback tiers:", list(decision.fallback_routing_tiers))
+print("fallback tiers:", list(decision.fallback_selection_tiers))
