@@ -34,6 +34,7 @@ class ModelTier:
     cost_score: float
     reliability_score: float
     enabled: bool = True
+    invocation: str = "openai_chat"
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +94,7 @@ class ModelSelection:
     provider: str
     model_name: str
     deployment_name: str
+    invocation: str = "openai_chat"
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +119,7 @@ class RankedCandidate:
     score: float
     score_components: tuple[ScoreComponent, ...]
     reasons: tuple[str, ...]
+    invocation: str = "openai_chat"
 
 
 @dataclass(frozen=True, slots=True)

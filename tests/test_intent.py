@@ -85,3 +85,8 @@ def test_end_to_end_resolve_build_context_then_select() -> None:
 
     assert resolution.capability == "code.implement"
     assert decision.primary_selection_tier == "coding_primary"
+    assert decision.primary.provider == "hosted"
+    assert decision.primary.model_name == "coding_model"
+    assert decision.primary.deployment_name == "coding_model"
+    assert decision.primary.invocation == "openai_chat"
+    assert all(fallback.deployment_name for fallback in decision.fallbacks)

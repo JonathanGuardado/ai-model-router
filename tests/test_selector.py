@@ -2,8 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from ai_model_selector.config_loader import load_task_profiles
-from ai_model_selector.models import ModelTier, RequestContext, RequiredConstraints, TaskProfile
+from ai_model_selector.config_loader import load_model_tiers, load_task_profiles
+from ai_model_selector.models import (
+    ModelSelection,
+    ModelTier,
+    RequestContext,
+    RequiredConstraints,
+    TaskProfile,
+)
 from ai_model_selector.selector import DeterministicSelector, SelectionError
 
 
@@ -33,6 +39,7 @@ def test_select_with_explicit_trivial_capability_prefers_local_fast() -> None:
     assert decision.primary_selection_tier == "local_fast"
     assert decision.primary_model == "local_model"
     assert decision.primary.provider == "local"
+    assert decision.primary.invocation == "openai_chat"
     assert len(decision.fallback_models) == 2
 
 
@@ -53,6 +60,40 @@ def test_select_prompt_convenience_uses_intent_resolver_for_code_request() -> No
 
     assert decision.capability == "code.implement"
     assert decision.primary_selection_tier == "coding_primary"
+
+
+def test_select_prompt_requires_configured_capabilities() -> None:
+    selector = _selector()
+
+    with pytest.raises(SelectionError, match="Pass capabilities_path to from_yaml"):
+        selector.select_prompt("Write a Python function and tests")
+
+
+def test_models_yaml_without_invocation_defaults_to_openai_chat(tmp_path: Path) -> None:
+    models_path = tmp_path / "models.yaml"
+    models_path.write_text(
+        """
+models:
+  - selection_tier: local_fast
+    provider: local
+    model_name: local_model
+    deployment_name: local_model
+    role_tags: []
+    supports_tools: false
+    supports_json: true
+    long_context: false
+    coding_score: 1
+    reasoning_score: 1
+    latency_score: 1
+    cost_score: 1
+    reliability_score: 1
+""",
+        encoding="utf-8",
+    )
+
+    models = load_model_tiers(models_path)
+
+    assert models[0].invocation == "openai_chat"
 
 
 def test_select_with_explicit_web_research_capability_requires_tools() -> None:
@@ -81,6 +122,104 @@ def test_select_with_explicit_code_capability_prefers_coding_primary() -> None:
     )
     assert decision.primary_selection_tier == "coding_primary"
     assert decision.primary.deployment_name == "coding_model"
+    assert decision.primary.invocation == "openai_chat"
+
+
+def test_selection_plan_preserves_endpoint_metadata_from_models_yaml(
+    tmp_path: Path,
+) -> None:
+    models_path = tmp_path / "models.yaml"
+    profiles_path = tmp_path / "profiles.yaml"
+    models_path.write_text(
+        """
+models:
+  - selection_tier: coding_primary
+    provider: openrouter
+    model_name: descriptive-coder
+    deployment_name: provider/coder-runtime-id
+    invocation: openai_chat
+    role_tags: [coding]
+    supports_tools: true
+    supports_json: true
+    long_context: true
+    coding_score: 10
+    reasoning_score: 7
+    latency_score: 5
+    cost_score: 5
+    reliability_score: 8
+  - selection_tier: local_fast
+    provider: local
+    model_name: local-fast-label
+    deployment_name: local-runtime-id
+    invocation: openai_chat
+    role_tags: [fast]
+    supports_tools: true
+    supports_json: true
+    long_context: true
+    coding_score: 5
+    reasoning_score: 4
+    latency_score: 10
+    cost_score: 10
+    reliability_score: 6
+""",
+        encoding="utf-8",
+    )
+    profiles_path.write_text(
+        """
+task_profiles:
+  - capability: code.implement
+    preferred_tiers: [coding_primary]
+    scoring_weights:
+      coding: 1
+    fallback_count: 1
+""",
+        encoding="utf-8",
+    )
+    selector = DeterministicSelector.from_yaml(models_path, profiles_path)
+
+    decision = selector.select(RequestContext(capability="code.implement"))
+
+    assert decision.primary == ModelSelection(
+        selection_tier="coding_primary",
+        provider="openrouter",
+        model_name="descriptive-coder",
+        deployment_name="provider/coder-runtime-id",
+        invocation="openai_chat",
+    )
+    assert decision.fallbacks == (
+        ModelSelection(
+            selection_tier="local_fast",
+            provider="local",
+            model_name="local-fast-label",
+            deployment_name="local-runtime-id",
+            invocation="openai_chat",
+        ),
+    )
+    assert decision.ranked_candidates[0].deployment_name == "provider/coder-runtime-id"
+    assert decision.ranked_candidates[0].invocation == "openai_chat"
+
+
+def test_fallbacks_are_full_endpoint_objects_and_compat_properties() -> None:
+    selector = _selector()
+
+    decision = selector.select(
+        RequestContext(
+            capability="code.implement",
+            needs_tools=True,
+            needs_json=True,
+            priority="quality",
+        )
+    )
+
+    assert all(isinstance(fallback, ModelSelection) for fallback in decision.fallbacks)
+    assert all(fallback.provider for fallback in decision.fallbacks)
+    assert all(fallback.deployment_name for fallback in decision.fallbacks)
+    assert decision.fallback_models == tuple(
+        fallback.model_name for fallback in decision.fallbacks
+    )
+    assert decision.fallback_selection_tiers == tuple(
+        fallback.selection_tier for fallback in decision.fallbacks
+    )
 
 
 def test_architecture_design_retry_escalates_to_reasoning_primary() -> None:

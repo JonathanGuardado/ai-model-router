@@ -100,6 +100,7 @@ def load_model_tiers(path: str | Path) -> tuple[ModelTier, ...]:
                 cost_score=float(item.get("cost_score", 0)),
                 reliability_score=float(item.get("reliability_score", 0)),
                 enabled=bool(item.get("enabled", True)),
+                invocation=str(item.get("invocation", "openai_chat")),
             )
         )
 

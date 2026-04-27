@@ -93,6 +93,7 @@ class DeterministicSelector:
                 score=round(score, 6),
                 score_components=components,
                 reasons=reasons,
+                invocation=model.invocation,
             )
             for model, score, components, reasons in ranked_pool
         )
@@ -135,6 +136,7 @@ class DeterministicSelector:
             provider=candidate.provider,
             model_name=candidate.model_name,
             deployment_name=candidate.deployment_name,
+            invocation=candidate.invocation,
         )
 
     def _resolve_profile(self, capability: str) -> TaskProfile:

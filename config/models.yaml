@@ -3,6 +3,7 @@ models:
     provider: local
     model_name: local_model
     deployment_name: local_model
+    invocation: openai_chat
     role_tags: [local, fast, trivial]
     supports_tools: false
     supports_json: true
@@ -18,6 +19,7 @@ models:
     provider: hosted
     model_name: web_model
     deployment_name: web_model
+    invocation: openai_chat
     role_tags: [web, agent, research]
     supports_tools: true
     supports_json: true
@@ -33,6 +35,7 @@ models:
     provider: hosted
     model_name: coding_model
     deployment_name: coding_model
+    invocation: openai_chat
     role_tags: [coding, implementation]
     supports_tools: true
     supports_json: true
@@ -48,6 +51,7 @@ models:
     provider: hosted
     model_name: reasoning_model
     deployment_name: reasoning_model
+    invocation: openai_chat
     role_tags: [premium, reasoning, architecture]
     supports_tools: true
     supports_json: true

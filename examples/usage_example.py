@@ -15,6 +15,8 @@ resolver = IntentResolver(
     load_capability_definitions(root / "config" / "capabilities.yaml")
 )
 
+# Keep the integration boundary explicit:
+# resolver owns intent, context builder owns request signals, selector owns model policy.
 resolution = resolver.resolve("Design a scalable notification system")
 context = build_request_context(resolution)
 decision = selector.select(context)
@@ -25,7 +27,10 @@ print("intent debug:", list(resolution.debug))
 print("request context:", context)
 print("primary tier:", decision.primary.selection_tier)
 print("primary endpoint:", decision.primary)
+print("primary deployment:", decision.primary.deployment_name)
+print("primary invocation:", decision.primary.invocation)
 print("fallback tiers:", list(decision.fallback_selection_tiers))
+print("fallback endpoints:", list(decision.fallbacks))
 print(
     "ranked:",
     [(c.selection_tier, c.model_name, c.score) for c in decision.ranked_candidates],
