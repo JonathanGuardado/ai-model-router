@@ -199,6 +199,81 @@ task_profiles:
     assert decision.ranked_candidates[0].invocation == "openai_chat"
 
 
+def test_fallbacks_skip_duplicate_execution_endpoints(tmp_path: Path) -> None:
+    models_path = tmp_path / "models.yaml"
+    profiles_path = tmp_path / "profiles.yaml"
+    models_path.write_text(
+        """
+models:
+  - selection_tier: coding_primary
+    provider: minimax
+    model_name: MiniMax-M2.7
+    deployment_name: MiniMax-M2.7
+    invocation: openai_chat
+    role_tags: [coding]
+    supports_tools: true
+    supports_json: true
+    long_context: true
+    coding_score: 10
+    reasoning_score: 8
+    latency_score: 5
+    cost_score: 5
+    reliability_score: 8
+  - selection_tier: design_primary
+    provider: minimax
+    model_name: MiniMax-M2.7
+    deployment_name: MiniMax-M2.7
+    invocation: openai_chat
+    role_tags: [architecture]
+    supports_tools: true
+    supports_json: true
+    long_context: true
+    coding_score: 9
+    reasoning_score: 9
+    latency_score: 5
+    cost_score: 5
+    reliability_score: 8
+  - selection_tier: web_fallback
+    provider: gemini
+    model_name: gemini-flash
+    deployment_name: gemini-2.5-flash
+    invocation: openai_chat
+    role_tags: [fallback]
+    supports_tools: true
+    supports_json: true
+    long_context: true
+    coding_score: 6
+    reasoning_score: 6
+    latency_score: 10
+    cost_score: 8
+    reliability_score: 8
+""",
+        encoding="utf-8",
+    )
+    profiles_path.write_text(
+        """
+task_profiles:
+  - capability: code.implement
+    scoring_weights:
+      coding: 1
+    fallback_count: 2
+""",
+        encoding="utf-8",
+    )
+    selector = DeterministicSelector.from_yaml(models_path, profiles_path)
+
+    decision = selector.select(RequestContext(capability="code.implement"))
+
+    assert decision.primary.selection_tier == "coding_primary"
+    assert decision.fallback_selection_tiers == ("web_fallback",)
+    assert [candidate.selection_tier for candidate in decision.ranked_candidates] == [
+        "coding_primary",
+        "design_primary",
+        "web_fallback",
+    ]
+    assert any("deduped_endpoint:design_primary" in item for item in decision.debug_reasons)
+
+
 def test_fallbacks_are_full_endpoint_objects_and_compat_properties() -> None:
     selector = _selector()
 

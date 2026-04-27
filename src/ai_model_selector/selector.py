@@ -98,11 +98,15 @@ class DeterministicSelector:
             for model, score, components, reasons in ranked_pool
         )
 
-        fallback_count = max(0, min(profile.fallback_count, len(ranked_candidates) - 1))
-        primary = self._selection_from_candidate(ranked_candidates[0])
+        execution_candidates = self._unique_execution_candidates(ranked_candidates, debug)
+        fallback_count = max(
+            0,
+            min(profile.fallback_count, len(execution_candidates) - 1),
+        )
+        primary = self._selection_from_candidate(execution_candidates[0])
         fallbacks = tuple(
             self._selection_from_candidate(candidate)
-            for candidate in ranked_candidates[1 : 1 + fallback_count]
+            for candidate in execution_candidates[1 : 1 + fallback_count]
         )
 
         return SelectionDecision(
@@ -138,6 +142,29 @@ class DeterministicSelector:
             deployment_name=candidate.deployment_name,
             invocation=candidate.invocation,
         )
+
+    def _unique_execution_candidates(
+        self,
+        candidates: tuple[RankedCandidate, ...],
+        debug: list[str],
+    ) -> tuple[RankedCandidate, ...]:
+        unique: list[RankedCandidate] = []
+        seen: dict[tuple[str, str, str], str] = {}
+        for candidate in candidates:
+            key = (
+                candidate.provider,
+                candidate.deployment_name,
+                candidate.invocation,
+            )
+            existing_tier = seen.get(key)
+            if existing_tier is not None:
+                debug.append(
+                    f"deduped_endpoint:{candidate.selection_tier}:same_endpoint_as={existing_tier}"
+                )
+                continue
+            seen[key] = candidate.selection_tier
+            unique.append(candidate)
+        return tuple(unique)
 
     def _resolve_profile(self, capability: str) -> TaskProfile:
         if capability in self._profiles:
